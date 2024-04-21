@@ -158,7 +158,7 @@ channel - номер канала. 8 каналов АЦП я разбил на 
 
 
 # Плата с ADS1115
-![alt text](https://github.com/octaprog7/ltr390uv/blob/master/pics/board_ltr390.jpg)
+![alt text](https://github.com/octaprog7/ads1115/blob/master/pics/1115_board.jpg)
 # Среда разработки (IDE)
 ## IDE
-![alt text](https://github.com/octaprog7/ltr390uv/blob/master/pics/lux_mini.png)
+![alt text](https://github.com/octaprog7/ads1115/blob/master/pics/ide_1115.png)
