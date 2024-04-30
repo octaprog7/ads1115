@@ -1,10 +1,11 @@
 import sys
 from machine import I2C, Pin
 from sensor_pack_2.bus_service import I2cAdapter
+from sensor_pack_2.adcmod import ADC
 import ads1115mod
 import time
 
-
+'''
 def decode_comp_props(source: ads1115mod.comparator_props):
     """Выводит в stdout свойства компаратора АЦП"""
     print(f"mode: {source.mode}")
@@ -57,6 +58,16 @@ def decode_common_props(source: ads1115mod.common_props):
     else:
         tmp = 250, 475, 860
         print(f"data rate: {tmp[source.data_rate - 5]} отсчетов в секунду(!)")
+'''
+
+
+def show_info(sen: ADC):
+    print(16 * "--")
+    _td = sen.get_conversion_cycle_time()
+    print(f"Время преобразования [мкс]: {_td}")
+    print(f"Коэффициент усиления PGA: {sen.gain}")
+    print(f"LSB: {sen.get_lsb()}")
+    print(16 * "--")
 
 
 if __name__ == '__main__':
@@ -79,35 +90,43 @@ if __name__ == '__main__':
     #
     print("---Одиночный режим измерения---")
     my_gain = 2
-    sensor.start_measurement(single_shot=True, data_rate_raw=2, gain_raw=my_gain, channel=0, differential_channel=False)
+    my_data_rate = 0
+    sensor.start_measurement(single_shot=True, data_rate_raw=my_data_rate, gain_raw=my_gain,
+                             channel=0, differential_channel=False)
     print("---Основные 'сырые' настройки датчика---")
     gp = sensor.get_general_raw_props()
     print(gp)
     print(16 * "--")
     td = sensor.get_conversion_cycle_time()
-    print(f"Время преобразования [мкс]: {td}")
+    show_info(sensor)
     for _ in range(10):
         time.sleep_us(td)
         # print(f"value: {sensor.value}; raw: {sensor.get_value(raw=True)}")
         print(f"value: {sensor.value}")
-        sensor.start_measurement(single_shot=True, data_rate_raw=2, gain_raw=my_gain, channel=0, differential_channel=False)
+        sensor.start_measurement(single_shot=True, data_rate_raw=my_data_rate, gain_raw=my_gain,
+                                 channel=0, differential_channel=False)
 
     print("Определение 'зашкаливания' за предел измерения АЦП")
     print(16 * "--")
-    sensor.start_measurement(single_shot=True, data_rate_raw=2, gain_raw=my_gain, channel=0, differential_channel=False)
+    sensor.start_measurement(single_shot=True, data_rate_raw=my_data_rate, gain_raw=my_gain,
+                             channel=0, differential_channel=False)
     td = sensor.get_conversion_cycle_time()
+    show_info(sensor)
     for _ in range(33):
         time.sleep_us(td)
         ex = sensor.get_raw_value_ex()
         voltage = sensor.raw_value_to_real(ex.value)
         print(f"get_raw_value_ex: {ex}; voltage: {voltage} Вольт")
-        sensor.start_measurement(single_shot=True, data_rate_raw=2, gain_raw=my_gain, channel=0, differential_channel=False)
+        sensor.start_measurement(single_shot=True, data_rate_raw=my_data_rate, gain_raw=my_gain,
+                                 channel=0, differential_channel=False)
 
     print(16 * "--")
     print("Автоматический режим измерений АЦП")
     print(16 * "--")
-    sensor.start_measurement(single_shot=False, data_rate_raw=0, gain_raw=my_gain, channel=0, differential_channel=False)
+    sensor.start_measurement(single_shot=False, data_rate_raw=my_data_rate, gain_raw=my_gain,
+                             channel=0, differential_channel=False)
     td = sensor.get_conversion_cycle_time()
+    show_info(sensor)
     time.sleep_us(td)
     _max = 3000
     for counter, voltage in enumerate(sensor):

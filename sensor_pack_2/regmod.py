@@ -7,6 +7,8 @@
 from sensor_pack_2.base_sensor import DeviceEx, get_error_str, check_value
 from sensor_pack_2.bitfield import BitFields
 
+# 24.04.2024 было-> address: int; стало-> address: [int, None]. Смотри def __init__(...
+
 
 class BaseRegistry:
     """Представление аппаратного регистра. Базовый класс."""
@@ -17,7 +19,7 @@ class BaseRegistry:
         # print(f"DBG: _get_width: {mx}")
         return 1 + int((mx - 1)/8)
 
-    def __init__(self, device: [DeviceEx, None], address: int, fields: BitFields, byte_len: [int, None] = None):
+    def __init__(self, device: [DeviceEx, None], address: [int, None], fields: BitFields, byte_len: [int, None] = None):
         """device - устройство, которому принадлежит регистр.
         address - адрес регистра в памяти устройства.
         fields - битовые поля регистра.
@@ -40,6 +42,10 @@ class BaseRegistry:
                         get_error_str('field.position.step', field.position.step, range(1, 2)))  # шаг только единица!
         #
         self._value = 0  # значение, считанное из регистра
+
+    def _rw_enabled(self) -> bool:
+        """Возвращает Истина, когда возможна запись в регистр по шине"""
+        return self._device is not None and self._address is not None
 
     def __len__(self) -> int:
         return len(self._fields)
@@ -85,7 +91,7 @@ class RegistryRO(BaseRegistry):
 
     def read(self) -> [int, None]:
         """Чтение значения из регистра устройства и запись его в поле класса"""
-        if not self._device:
+        if not self._rw_enabled():
             return
         bl = self._byte_len
         by = self._device.read_reg(self._address, bl)
@@ -104,7 +110,7 @@ class RegistryRW(RegistryRO):
     def write(self, value: [int, None] = None):
         """Запись значения в регистр устройства.
         Если value в None, то метод запишет в регистр значение поля self.value"""
-        if self._device:
+        if self._rw_enabled():
             val = value if value else self.value
             self._device.write_reg(self._address, val, self._byte_len)
             # print(f"DBG:RegistryRW.write: 0x{val:x}")

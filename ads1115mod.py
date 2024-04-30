@@ -136,19 +136,12 @@ class Ads1115(DeviceEx, ADC, Iterator):
     @micropython.native
     def get_conversion_cycle_time(self) -> int:
         """возвращает время преобразования в [мкc] аналогового значения в цифровое"""
-        dr = self._curr_data_rate
-        if dr in range(5):
-            freq = 8 * 2 ** dr
-        else:
-            tmp = 250, 475, 860
-            freq = tmp[dr - 5]
-        # внимание, результат в микросекундах!!!
-        return int(1_000_000 / freq)
+        return 1 + int(1_000_000 / self.sample_rate)
 
     def gain_raw_to_real(self, gain_raw: int) -> float:
         """Преобразует 'сырое' значение усиления в 'настоящее'"""
         # self._natural_gain = _natural_gains[raw_gain]
-        return _natural_gains[gain_raw]
+        return 1 / _natural_gains[gain_raw]
 
 #    @staticmethod
 #    def get_correct_gain(self, gain_raw: int) -> int:
@@ -296,9 +289,9 @@ class Ads1115(DeviceEx, ADC, Iterator):
         # обновление значений полей экземпляра класса
         self._operational_status = reg['OS']
         mux_raw_cfg_to_channel(reg['MUX'])
-        self._curr_gain = _get_correct_gain(reg['PGA'])
+        self._curr_raw_gain = _get_correct_gain(reg['PGA'])
         self._single_shot_mode = reg['MODE']
-        self._curr_data_rate = reg['DR']
+        self._curr_raw_data_rate = reg['DR']
         self._curr_resolution = self.init_props.max_resolution        # число бит в отсчете не изменяется у этого АЦП
         # comparator
         self._comparator_mode = reg['COMP_MODE']
@@ -313,9 +306,9 @@ class Ads1115(DeviceEx, ADC, Iterator):
         return self._adc_props_to_raw(
             operational_status=self._single_shot_mode,
             in_mux_config=Ads1115.get_raw_mux_cfg(self._curr_channel, self._is_diff_channel),
-            gain_amplifier=self._curr_gain,
+            gain_amplifier=self.current_raw_gain,
             operating_mode=self._single_shot_mode,
-            data_rate=self._curr_data_rate,
+            data_rate=self.current_sample_rate,
             comparator_mode=None,
             comparator_polarity=None,
             comparator_latch=None,
@@ -355,6 +348,18 @@ class Ads1115(DeviceEx, ADC, Iterator):
         return specific_props(mode=self._comparator_mode, polarity=self._comparator_polarity,
                               latch=self._comparator_latch, queue=self._comparator_queue,
                               lo_threshold=thr[0], hi_threshold=thr[1])
+
+    def get_resolution(self, raw_data_rate: int) -> int:
+        """Возвращает кол-во бит в отсчете АЦП в зависимости от частоты взятия отсчетов (сырое значение!).
+        Переопределить в классе - наследнике!"""
+        # у данного АЦП разрешение не изменяется!
+        return 16
+
+    def raw_sample_rate_to_real(self, raw_sample_rate: int) -> float:
+        """Преобразует сырое значение частоты преобразования в [Гц].
+        Переопределить в классе - наследнике!"""
+        sps = 8, 16, 32, 64, 128, 250, 475, 860
+        return sps[raw_sample_rate]
 
     # Iterator
     def __iter__(self):

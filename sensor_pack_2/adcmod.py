@@ -69,11 +69,11 @@ class ADC:
         model - модель АЦП в виде строки"""
         self.init_props = init_props
         adc_ip = self.init_props
-        if adc_ip.reference_voltage <= 0 or adc_ip.channels < 1 or adc_ip.differential_channels < 0:
+        if adc_ip.reference_voltage <= 0 or adc_ip.channels < 0 or adc_ip.differential_channels < 0:
             raise ValueError(f"Неверный параметр! Опорное напряжение, В: {adc_ip.reference_voltage}; Кол-во каналов: {adc_ip.channels}/{adc_ip.differential_channels}")
-        # текущее количество выполняемых преобразований аналогового сигнала в цифровой (SPS) в секунду! RAW!
+        # текущее количество выполняемых преобразований аналогового сигнала в цифровой! RAW, сырое значение!
         # для записи в регистр
-        self._curr_data_rate = None
+        self._curr_raw_data_rate = None
         # текущее разрешение АЦП в битах
         self._curr_resolution = None
         # текущий номер канала. Диапазон 0..self._channels/self._diff_channels. Проверка на правильность в методе
@@ -82,7 +82,7 @@ class ADC:
         # если Истина, то self._curr_channel это дифференциальный(!) канал, иначе канал не дифференциальный(!)
         self._is_diff_channel = None
         # текущий коэффициент усиления (raw). Для записи в регистр АЦП
-        self._curr_gain = None  # RAW!
+        self._curr_raw_gain = None  # RAW!
         # действительный текущий коэффициент усиления.
         # присвойте его в классе - наследнике путем пересчета из self._curr_gain. Смотри метод Ads1115.get_correct_gain
         self._real_gain = None
@@ -102,12 +102,12 @@ class ADC:
     def get_general_props(self) -> adc_general_props:
         """Возвращает основные свойства АЦП"""
         ipr = self.init_props
-        return adc_general_props(ipr.reference_voltage, self._curr_resolution, ipr.max_resolution, self._curr_channel,
+        return adc_general_props(ipr.reference_voltage, self.current_resolution, ipr.max_resolution, self._curr_channel,
                                  ipr.channels, ipr.differential_channels)
 
     def get_general_raw_props(self) -> adc_general_raw_props:
         """Возвращает основные 'сырые' свойства АЦП, которые считываются из регистра"""
-        return adc_general_raw_props(sample_rate=self._curr_data_rate, gain_amplifier=self._curr_gain,
+        return adc_general_raw_props(sample_rate=self._curr_raw_data_rate, gain_amplifier=self._curr_raw_gain,
                                      single_shot_mode=self._single_shot_mode)
 
     def get_specific_props(self):
@@ -140,7 +140,7 @@ class ADC:
         gain - коэффициент усиления/ослабления входного делителя АЦП, должен быть больше нуля!"""
         ipr = self.init_props
         _k = 2 if ipr.differential_mode else 1
-        return _k * self._real_gain * ipr.reference_voltage / (2 ** self._curr_resolution)
+        return _k * ipr.reference_voltage / (self.gain * 2 ** self.current_resolution)
 
     def get_conversion_cycle_time(self) -> int:
         """возвращает время преобразования в [мкc/мс] аналогового значения в цифровое в зависимости от
@@ -166,7 +166,7 @@ class ADC:
         Переопределяется в классах - наследниках!
         delta - 'зазор'"""
         raw = self.get_raw_value()
-        limits = _get_reg_raw_limits(self._curr_resolution, self.init_props.differential_mode)
+        limits = _get_reg_raw_limits(self.current_resolution, self.init_props.differential_mode)
         return raw_value_ex(value=raw, low_limit=raw in range(limits.low_limit, 1 + delta + limits.low_limit),
                             hi_limit=raw in range(limits.hi_limit - delta, 1 + limits.hi_limit))
 
@@ -175,7 +175,8 @@ class ADC:
         return raw_val * self.get_lsb()
 
     def gain_raw_to_real(self, raw_gain: int) -> float:
-        """Преобразует 'сырое' значение усиления в 'настоящее'"""
+        """Преобразует 'сырое' значение усиления в 'настоящее'.
+        Переопределить в классе - наследнике!"""
         raise NotImplemented
 
     def get_value(self, raw: bool = True) -> float:
@@ -184,6 +185,11 @@ class ADC:
         if raw:
             return val
         return self.raw_value_to_real(val)
+
+    def get_resolution(self, raw_data_rate: int) -> int:
+        """Возвращает кол-во бит в отсчете АЦП в зависимости от частоты взятия отсчетов (сырое значение!).
+        Переопределить в классе - наследнике!"""
+        raise NotImplemented
 
     def get_current_channel(self) -> adc_channel_info:
         """Возвращает информацию о текущем активном канале АЦП"""
@@ -216,9 +222,10 @@ class ADC:
         self.check_channel_number(channel, differential_channel)  # проверка на правильность
         #
         self._single_shot_mode = single_shot
-        self._curr_data_rate = data_rate_raw
-        self._curr_gain = gain_raw
+        self._curr_raw_data_rate = data_rate_raw
+        self._curr_raw_gain = gain_raw
         self._curr_channel = channel
+        self._curr_resolution = self.get_resolution(data_rate_raw)
         self._is_diff_channel = differential_channel
         # переопределяемые для каждого АЦП, методы
         _raw_cfg = self.adc_properties_to_raw_config()
@@ -227,22 +234,62 @@ class ADC:
         _raw_cfg = self.get_raw_config()    # читаю настройки АЦП
         self.raw_config_to_adc_properties(_raw_cfg)     # обновляю поля экземпляра класса
         # пересчет в реальное усиление
-        self._real_gain = self.gain_raw_to_real(self._curr_gain)
+        self._real_gain = self.gain_raw_to_real(self._curr_raw_gain)
 
     def raw_config_to_adc_properties(self, raw_config: int):
         """Возвращает текущие настройки датчика из числа, возвращенного get_raw_config(!), в поля(!) класса.
-        raw_config -> adc_properties"""
+        raw_config -> adc_properties.
+        Переопределить в классе - наследнике!"""
         raise NotImplemented
 
     def adc_properties_to_raw_config(self) -> int:
         """Преобразует свойства АЦП из полей класса в 'сырую' конфигурацию АЦП.
-        adc_properties -> raw_config"""
+        adc_properties -> raw_config.
+        Переопределить в классе - наследнике!"""
         raise NotImplemented
 
     def get_raw_config(self) -> int:
-        """Возвращает(считывает) текущие настройки датчика из регистров(конфигурации) в виде числа."""
+        """Возвращает(считывает) текущие настройки датчика из регистров(конфигурации) в виде числа.
+        Переопределить в классе - наследнике!"""
         raise NotImplemented
 
     def set_raw_config(self, value: int):
-        """Записывает настройки(value) во внутреннюю память/регистр датчика."""
+        """Записывает настройки(value) во внутреннюю память/регистр датчика.
+        Переопределить в классе - наследнике!"""
         raise NotImplemented
+
+    def raw_sample_rate_to_real(self, raw_sample_rate: int) -> float:
+        """Преобразует сырое значение частоты преобразования в [Гц].
+        Переопределить в классе - наследнике!"""
+        raise NotImplemented
+
+    @property
+    def sample_rate(self) -> float:
+        """Возвращает текущее число отсчетов в секунду"""
+        return self.raw_sample_rate_to_real(self.current_sample_rate)
+
+    @property
+    def current_sample_rate(self) -> int:
+        """Возвращает текущее сырое(!) количество отсчетов АЦП"""
+        return self._curr_raw_data_rate
+
+    @property
+    def current_raw_gain(self) -> int:
+        """Возвращает текущий сырой(!) коэффициент усиления АЦП"""
+        return self._curr_raw_gain
+
+    @property
+    def gain(self) -> float:
+        """Возвращает текущий реальный коэффициент усиления АЦП"""
+        return self._real_gain
+
+    @property
+    def current_resolution(self) -> int:
+        """Возвращает текущее(!) кол-во бит в отсчете АЦП"""
+        return self._curr_resolution
+
+    @property
+    def single_shot_mode(self) -> bool:
+        """Возвращает Истина, Если АЦП настроен на однократный(single shot conversion) режим работы,
+        иначе на непрерывный (continuous conversion mode)"""
+        return self._single_shot_mode
