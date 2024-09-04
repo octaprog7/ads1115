@@ -61,7 +61,6 @@ _natural_gains = 3.0, 2.0, 1.0, 1/2, 1/4, 1/8
 def _get_lsb(gain_amp: int) -> float:
     """Возвращает цену младшего разряда в зависимости от настройки входного делителя напряжения.
     gain_amp = 0..5"""
-    print(f"DBG: lsb: {_lsb[gain_amp]}; {gain_amp}")
     return _lsb[gain_amp]
 
 
@@ -69,7 +68,6 @@ def _get_correct_gain(gain: int) -> int:
     """Проверяет усиление на правильность и возвращает правильное значение в диапазоне 0..5 включительно.
     gain - сырое/raw значение для записи в регистр"""
     check_value(gain, range(8), f"Неверное значение усиления: {gain}")
-    # print(f"DBG:_get_correct_gain: {gain}")
     if gain > 5:
         return 5
     return gain
@@ -90,15 +88,15 @@ class Ads1115(DeviceEx, ADC, Iterator):
     """АЦП на шине I2C от TI.
     Low-Power, I2C, 860-SPS, 16-Bit ADC with internal reference, oscillator, and programmable comparator"""
 
-    _config_reg_ads1115 = (bit_field_info(name='OS', position=range(15, 16), valid_values=None),    # Operational status or single-shot conversion start
-                           bit_field_info(name='MUX', position=range(12, 15), valid_values=None),   # Input multiplexer configuration
-                           bit_field_info(name='PGA', position=range(9, 12), valid_values=range(6)),    # Programmable gain amplifier configuration
-                           bit_field_info(name='MODE', position=range(8, 9), valid_values=None),        # Device operating mode
-                           bit_field_info(name='DR', position=range(5, 8), valid_values=None),          # Data rate
-                           bit_field_info(name='COMP_MODE', position=range(4, 5), valid_values=None),   # Comparator mode
-                           bit_field_info(name='COMP_POL', position=range(3, 4), valid_values=None),    # Comparator polarity
-                           bit_field_info(name='COMP_LAT', position=range(2, 3), valid_values=None),    # Latching comparator
-                           bit_field_info(name='COMP_QUE', position=range(0, 2), valid_values=None)     # Comparator queue and disable
+    _config_reg_ads1115 = (bit_field_info(name='OS', position=range(15, 16), valid_values=None, description=None),          # Operational status or single-shot conversion start
+                           bit_field_info(name='MUX', position=range(12, 15), valid_values=None, description=None),         # Input multiplexer configuration
+                           bit_field_info(name='PGA', position=range(9, 12), valid_values=range(6), description=None),      # Programmable gain amplifier configuration
+                           bit_field_info(name='MODE', position=range(8, 9), valid_values=None, description=None),          # Device operating mode
+                           bit_field_info(name='DR', position=range(5, 8), valid_values=None, description=None),            # Data rate
+                           bit_field_info(name='COMP_MODE', position=range(4, 5), valid_values=None, description=None),     # Comparator mode
+                           bit_field_info(name='COMP_POL', position=range(3, 4), valid_values=None, description=None),      # Comparator polarity
+                           bit_field_info(name='COMP_LAT', position=range(2, 3), valid_values=None, description=None),      # Latching comparator
+                           bit_field_info(name='COMP_QUE', position=range(0, 2), valid_values=None, description=None)       # Comparator queue and disable
                            )
 
     def __init__(self, adapter: bus_service.BusAdapter, address=0x48):
@@ -122,7 +120,6 @@ class Ads1115(DeviceEx, ADC, Iterator):
         # Внимание, важный вызов(!)
         # читаю config АЦП и обновляю поля класса
         _raw_cfg = self.get_raw_config()
-        # print(f"DBG: get_raw_config(): 0x{_raw_cfg:x}")
         self.raw_config_to_adc_properties(_raw_cfg)
 
     @staticmethod
@@ -236,7 +233,8 @@ class Ads1115(DeviceEx, ADC, Iterator):
                           ) -> int:
         """Возвращает 'сырое' значение настроек АЦП/датчика для записи в регистр CONF/config register.
         Регистр Config. (P[1:0] = 0x1) [reset value = 0x8583]"""
-        val = self.get_raw_config()  # читаю регистр CONF. Обязательная первая строка метода!!!
+        # val = self.get_raw_config()  # читаю регистр CONF. Обязательная первая строка метода!!!
+        self.get_raw_config()  # читаю регистр CONF. Обязательная первая строка метода!!!
         reg = self._config_reg
         # изменяю настройки. Ниже пишете свой код!
         if operational_status is not None:
@@ -322,7 +320,6 @@ class Ads1115(DeviceEx, ADC, Iterator):
     def _get_thresholds(self) -> tuple:
         """Возвращает пороговые значения компаратора в виде кортежа: (высокий порог, низкий порог)"""
         buf = self.read_buf_from_mem(0x02, self._buf_4)
-        # print(f"DBG: {buf}")
         return self.unpack(fmt_char="hh", source=buf)
 
     # def _set_thresholds(self, hi_val: int, lo_val: int):

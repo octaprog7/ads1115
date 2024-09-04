@@ -8,7 +8,7 @@ from machine import Pin
 
 
 @micropython.native
-def check_value(value: [int, None], valid_range, error_msg: str) -> [int, None]:
+def check_value(value: [int, None], valid_range: [range, tuple], error_msg: str) -> [int, None]:
     if value is None:
         return value
     if value not in valid_range:
@@ -16,12 +16,15 @@ def check_value(value: [int, None], valid_range, error_msg: str) -> [int, None]:
     return value
 
 
-def get_error_str(val_name: str, val: int, rng: range) -> str:
+def get_error_str(val_name: str, val: int, rng: [range, tuple]) -> str:
     """Возвращает подробное сообщение об ошибке.
     val_name - имя переменной в коде;
     val - значение переменной val_name;
     rng - допустимый диапазон переменной"""
-    return f"Значение {val} параметра {val_name} вне диапазона [{rng.start}..{rng.stop - 1}]!"
+    if isinstance(rng, range):
+        return f"Значение {val} параметра {val_name} вне диапазона [{rng.start}..{rng.stop - 1}]!"
+    # tuple
+    return f"Значение {val} параметра {val_name} вне диапазона: {rng}!"
 
 
 def all_none(*args):

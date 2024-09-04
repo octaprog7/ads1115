@@ -87,7 +87,6 @@ if __name__ == '__main__':
     gp = sensor.get_general_raw_props()
     print(gp)
     print(16 * "--")
-    #
     print("---Одиночный режим измерения---")
     my_gain = 2
     my_data_rate = 0
