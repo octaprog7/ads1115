@@ -1,0 +1,13 @@
+{
+  "urls": [
+    ["ads1115mod.py", "github:octaprog7/ads1115/ads1115mod.py"],
+    ["sensor_pack_2/__init__.py", "github:octaprog7/ads1115/sensor_pack_2/__init__.py"],
+    ["sensor_pack_2/adcmod.py", "github:octaprog7/ads1115/sensor_pack_2/adcmod.py"],
+    ["sensor_pack_2/base_sensor.py", "github:octaprog7/ads1115/sensor_pack_2/base_sensor.py"],
+    ["sensor_pack_2/bitfield.py", "github:octaprog7/ads1115/sensor_pack_2/bitfield.py"],
+    ["sensor_pack_2/bus_service.py", "github:octaprog7/ads1115/sensor_pack_2/bus_service.py"],
+    ["sensor_pack_2/regmod.py", "github:octaprog7/ads1115/sensor_pack_2/regmod.py"]
+  ],
+  "version": "1.0.0",
+  "deps": []
+}
